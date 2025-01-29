@@ -1,0 +1,77 @@
+provider "azurerm" {
+ features {}
+}
+# Create a resource group
+resource "azurerm_resource_group" "test" {
+ name     = "test"
+ location = "East US"  # You can change the location as needed
+}
+# Create a resource group for the VM
+resource "azurerm_resource_group" "teat1" {
+ name     = "teat1"
+ location = "East US"  # You can change the location as needed
+}
+# Create a virtual network
+resource "azurerm_virtual_network" "vnet" {
+ name                = "test-vnet"
+ address_space       = ["10.0.0.0/16"]
+ location            = azurerm_resource_group.teat1.location
+ resource_group_name = azurerm_resource_group.teat1.name
+}
+# Create a subnet
+resource "azurerm_subnet" "subnet" {
+ name                 = "test-subnet"
+ resource_group_name  = azurerm_resource_group.teat1.name
+ virtual_network_name = azurerm_virtual_network.vnet.name
+ address_prefixes     = ["10.0.1.0/24"]
+}
+# Create a public IP address
+resource "azurerm_public_ip" "publicip" {
+ name                = "test-publicip"
+ location            = azurerm_resource_group.teat1.location
+ resource_group_name = azurerm_resource_group.teat1.name
+ allocation_method   = "Dynamic"
+}
+# Create a network interface
+resource "azurerm_network_interface" "nic" {
+ name                = "test-nic"
+ location            = azurerm_resource_group.teat1.location
+ resource_group_name = azurerm_resource_group.teat1.name
+ ip_configuration {
+   name                          = "test-ipconfig"
+   subnet_id                     = azurerm_subnet.subnet.id
+   private_ip_address_allocation = "Dynamic"
+   public_ip_address_id          = azurerm_public_ip.publicip.id
+ }
+}
+# Create a virtual machine
+resource "azurerm_virtual_machine" "vm" {
+ name                  = "test-vm"
+ location              = azurerm_resource_group.teat1.location
+ resource_group_name   = azurerm_resource_group.teat1.name
+ network_interface_ids = [azurerm_network_interface.nic.id]
+ vm_size               = "Standard_DS1_v2"  # You can change the VM size as needed
+ storage_image_reference {
+   publisher = "Canonical"
+   offer     = "UbuntuServer"
+   sku       = "16.04-LTS"
+   version   = "latest"
+ }
+ storage_os_disk {
+   name              = "test-osdisk"
+   caching           = "ReadWrite"
+   create_option     = "FromImage"
+   managed_disk_type = "Standard_LRS"
+ }
+ os_profile {
+   computer_name  = "testvm"
+   admin_username = "test"
+   admin_password = "Password1234!"  # Please change this to a secure password
+ }
+ os_profile_linux_config {
+   disable_password_authentication = false
+ }
+}
+output "public_ip_address" {
+ value = azurerm_public_ip.publicip.ip_address
+}
